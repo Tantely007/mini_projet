@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: pythontest
+  labels:
+    app: pythontest
+spec:
+  type: NodePort
+  ports:
+    - port: 5000       # Port interne du service
+      targetPort: 5000 # Port exposé par le conteneur dans le deployment
+      nodePort: 31000  # Port fixe pour accéder à l'app depuis localhost:31000
+  selector:
+    app: pythontest    # Doit correspondre exactement au label du Deployment

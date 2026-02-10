@@ -29,6 +29,10 @@ spec:
 """
         }
     }
+    
+    triggers {
+        pollSCM('*******') // Vérifie les changements chaque minute [cite: 268]
+    }
 
     stages {
         stage('Test python') {
@@ -43,9 +47,8 @@ spec:
         stage('Build image') {
             steps {
                 container('docker') {
-                    // Utilisation d'un registry local sur le port 4000
-                    sh "docker build -t localhost:4000/flask_hello:latest ."
-                    sh "docker push localhost:4000/flask_hello:latest"
+                    sh "docker build -t localhost:4000/pythontest:latest ."
+                    sh "docker push localhost:4000/pythontest:latest"
                 }
             }
         }

@@ -1,13 +1,14 @@
 pipeline {
-agent {
+    agent {
         kubernetes {
+            // Définition du Pod qui va exécuter le build
             yaml """
 apiVersion: v1
 kind: Pod
 spec:
   containers:
   - name: python
-    image: python:3.7
+    image: python:3.7-slim
     command: ['cat']
     tty: true
   - name: docker
@@ -21,46 +22,58 @@ spec:
     image: lachlanevenson/k8s-kubectl:v1.17.2
     command: ['cat']
     tty: true
-  # AJOUTEZ CE BLOC CI-DESSOUS pour corriger l'erreur Git
   - name: jnlp
     image: jenkins/inbound-agent:alpine
-    env:
-    - name: JENKINS_URL
-      value: "http://10.186.26.69:9090/"
+  volumes:
+  - name: docker-sock
+    hostPath:
+      path: /var/run/docker.sock
 """
         }
     }
-    
+
     triggers {
-        pollSCM('H/2 * * * *') // Vérifie les changements chaque minute [cite: 268]
+        // Vérifie les changements sur GitHub toutes les 2 minutes
+        pollSCM('H/2 * * * *')
     }
 
     stages {
-        stage('Test python') {
+        stage('Install & Test') {
             steps {
                 container('python') {
-                    sh "pip install -r requirements.txt"
-                    sh "python test.py"
-                }
-            }
-        }
-        
-        stage('Build image') {
-            steps {
-                container('docker') {
-                    sh "docker build -t localhost:4000/pythontest:latest ."
-                    sh "docker push localhost:4000/pythontest:latest"
+                    sh 'pip install -r requirements.txt'
+                    // On lance les tests (assurez-vous que test.py existe)
+                    sh 'python test.py'
                 }
             }
         }
 
-        stage('Deploy') {
+        stage('Build Docker Image') {
             steps {
-                container('kubectl') {
-                    sh "kubectl apply -f ./kubernetes/deployment.yaml"
-                    sh "kubectl apply -f ./kubernetes/service.yaml"
+                container('docker') {
+                    // Construction de l'image (le nom doit correspondre à votre déploiement K8s)
+                    sh 'docker build -t flask-app:latest .'
                 }
             }
+        }
+
+        stage('Deploy to Kubernetes') {
+            steps {
+                container('kubectl') {
+                    // Déploiement dans le cluster local
+                    sh 'kubectl apply -f deployment.yaml'
+                    sh 'kubectl apply -f service.yaml'
+                }
+            }
+        }
+    }
+
+    post {
+        success {
+            echo 'Application déployée avec succès sur Kubernetes !'
+        }
+        failure {
+            echo 'Le pipeline a échoué. Vérifiez les logs.'
         }
     }
 }

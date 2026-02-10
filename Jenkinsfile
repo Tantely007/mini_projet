@@ -31,7 +31,7 @@ spec:
     }
     
     triggers {
-        pollSCM('* * * * *') // Vérifie les changements chaque minute [cite: 268]
+        pollSCM('H/2 * * * *') // Vérifie les changements chaque minute [cite: 268]
     }
 
     stages {

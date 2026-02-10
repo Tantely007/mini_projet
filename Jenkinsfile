@@ -1,7 +1,7 @@
 pipeline {
     agent {
         kubernetes {
-            // Définition du Pod qui va exécuter le build
+            // Définition du Pod avec 4 conteneurs (jnlp, python, docker, kubectl)
             yaml """
 apiVersion: v1
 kind: Pod
@@ -24,6 +24,11 @@ spec:
     tty: true
   - name: jnlp
     image: jenkins/inbound-agent:alpine
+    env:
+    - name: JENKINS_URL
+      value: "http://host.docker.internal:9090/"
+    - name: JENKINS_TUNNEL
+      value: "host.docker.internal:50000"
   volumes:
   - name: docker-sock
     hostPath:
@@ -33,7 +38,7 @@ spec:
     }
 
     triggers {
-        // Vérifie les changements sur GitHub toutes les 2 minutes
+        // Vérification automatique toutes les 2 minutes
         pollSCM('H/2 * * * *')
     }
 
@@ -42,7 +47,7 @@ spec:
             steps {
                 container('python') {
                     sh 'pip install -r requirements.txt'
-                    // On lance les tests (assurez-vous que test.py existe)
+                    // Exécution des tests unitaires
                     sh 'python test.py'
                 }
             }
@@ -51,7 +56,7 @@ spec:
         stage('Build Docker Image') {
             steps {
                 container('docker') {
-                    // Construction de l'image (le nom doit correspondre à votre déploiement K8s)
+                    // Construction de l'image locale
                     sh 'docker build -t flask-app:latest .'
                 }
             }
@@ -60,7 +65,7 @@ spec:
         stage('Deploy to Kubernetes') {
             steps {
                 container('kubectl') {
-                    // Déploiement dans le cluster local
+                    // Application des manifestes YAML sur le cluster local
                     sh 'kubectl apply -f deployment.yaml'
                     sh 'kubectl apply -f service.yaml'
                 }
@@ -70,10 +75,10 @@ spec:
 
     post {
         success {
-            echo 'Application déployée avec succès sur Kubernetes !'
+            echo 'Félicitations ! Build, Test et Déploiement réussis.'
         }
         failure {
-            echo 'Le pipeline a échoué. Vérifiez les logs.'
+            echo 'Le pipeline a échoué. Vérifiez les logs des conteneurs.'
         }
     }
 }

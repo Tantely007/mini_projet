@@ -1,7 +1,7 @@
 pipeline {
     agent {
         kubernetes {
-            // Définition du Pod avec 4 conteneurs (jnlp, python, docker, kubectl)
+            // Définition du Pod avec les ressources nécessaires
             yaml """
 apiVersion: v1
 kind: Pod
@@ -38,7 +38,6 @@ spec:
     }
 
     triggers {
-        // Vérification automatique toutes les 2 minutes
         pollSCM('H/2 * * * *')
     }
 
@@ -46,8 +45,8 @@ spec:
         stage('Install & Test') {
             steps {
                 container('python') {
-                    sh 'pip install -r requirements.txt'
-                    // Exécution des tests unitaires
+                    // On augmente le timeout et on ajoute des retries pour éviter le "Read timeout"
+                    sh 'pip install --default-timeout=100 --retries 5 -r requirements.txt'
                     sh 'python test.py'
                 }
             }
@@ -56,7 +55,8 @@ spec:
         stage('Build Docker Image') {
             steps {
                 container('docker') {
-                    // Construction de l'image locale
+                    // Construction de l'image. 
+                    // Note: 'flask-app' doit correspondre au nom utilisé dans votre deployment.yaml
                     sh 'docker build -t flask-app:latest .'
                 }
             }
@@ -65,9 +65,12 @@ spec:
         stage('Deploy to Kubernetes') {
             steps {
                 container('kubectl') {
-                    // Application des manifestes YAML sur le cluster local
+                    // Application des fichiers de configuration Kubernetes
                     sh 'kubectl apply -f deployment.yaml'
                     sh 'kubectl apply -f service.yaml'
+                    
+                    // Optionnel : Forcer le redémarrage pour prendre en compte la nouvelle image
+                    sh 'kubectl rollout restart deployment flask-deployment || echo "Premier déploiement"'
                 }
             }
         }
@@ -75,10 +78,10 @@ spec:
 
     post {
         success {
-            echo 'Félicitations ! Build, Test et Déploiement réussis.'
+            echo 'Pipeline terminé avec succès ! L\'application est déployée.'
         }
         failure {
-            echo 'Le pipeline a échoué. Vérifiez les logs des conteneurs.'
+            echo 'Le pipeline a échoué. Vérifiez les erreurs ci-dessus.'
         }
     }
 }

@@ -1,7 +1,6 @@
 pipeline {
-    agent {
+agent {
         kubernetes {
-            label 'jenkins-agent'
             yaml """
 apiVersion: v1
 kind: Pod
@@ -22,10 +21,12 @@ spec:
     image: lachlanevenson/k8s-kubectl:v1.17.2
     command: ['cat']
     tty: true
-  volumes:
-  - name: docker-sock
-    hostPath:
-      path: /var/run/docker.sock
+  # AJOUTEZ CE BLOC CI-DESSOUS pour corriger l'erreur Git
+  - name: jnlp
+    image: jenkins/inbound-agent:alpine
+    env:
+    - name: JENKINS_URL
+      value: "http://10.186.26.69:9090/"
 """
         }
     }
